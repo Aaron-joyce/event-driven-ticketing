@@ -1,0 +1,5 @@
+boto3>=1.28.0
+psycopg2-binary>=2.9.0
+sqlalchemy>=2.0.0
+pytest>=7.4.0
+moto[sqs]>=4.2.0
