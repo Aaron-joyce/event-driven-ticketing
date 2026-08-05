@@ -1,8 +1,9 @@
-import boto3
 import json
 import logging
 import os
-from db import record_transaction, init_db
+
+import boto3
+from db import init_db, record_transaction
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
@@ -36,7 +37,7 @@ class SQSWorker:
             logging.info(f"Deleted message {message['MessageId']} from SQS queue.")
             return True
         except Exception as e:
-            logging.error(f"Failed processing message {message.get('MessageId')}: {str(e)}")
+            logging.error(f"Failed processing message {message.get('MessageId')}: {e!s}")
             return False
 
     def poll(self, once: bool = False, db_session=None):
