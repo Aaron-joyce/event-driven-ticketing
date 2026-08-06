@@ -7,8 +7,8 @@ resource "aws_ecs_cluster" "main" {
   }
 }
 
-resource "aws_cloudwatch_log_group" "worker" {
-  name              = "/ecs/worker-${var.environment}"
+resource "aws_cloudwatch_log_group" "worker_logs" {
+  name              = "/ecs/worker-logs${var.environment}"
   retention_in_days = 7
 
   tags = {
@@ -54,7 +54,9 @@ resource "aws_ecs_task_definition" "worker" {
         { name = "AWS_REGION", value = var.aws_region },
         { name = "DB_HOST", value = var.db_host },
         { name = "DB_NAME", value = var.db_name },
-        { name = "DB_USER", value = var.db_user }
+        { name = "DB_USER", value = var.db_user },
+        { name = "CLOUDWATCH_LOG_GROUP", value = aws_cloudwatch_log_group.worker.name },
+        { name = "LOG_LEVEL", value = "INFO" }
       ]
       secrets = [
         {
