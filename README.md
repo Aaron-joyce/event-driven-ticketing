@@ -36,6 +36,8 @@ flowchart LR
 .
 ├── .github/
 │   └── workflows/          # GitHub Actions CI/CD workflows
+│       ├── pr.yml          # Pull request lint, secret scan, test, and tf validate
+│       └── deploy.yml      # Main merge build ECR image and terraform apply
 ├── worker/                 # Python background worker service (ECS Fargate)
 │   ├── db.py               # Database connections and SQLAlchemy models
 │   ├── main.py             # SQS polling loop and transaction handler
@@ -52,6 +54,7 @@ flowchart LR
 │   │   └── sqs/            # SQS & DLQ queue module
 │   └── environments/
 │       └── dev/            # Development environment deployment
+├── pyproject.toml          # Ruff linter configuration
 ├── pytest.ini              # Pytest configuration
 ├── COST.md                 # AWS Cost estimations & destroy instructions
 └── README.md               # Project documentation
@@ -70,21 +73,27 @@ flowchart LR
 ### Infrastructure & Security Layer
 - **Multi-AZ VPC Isolation**: Provisions 2 Public Subnets, 2 Private Application Subnets, and 2 Private Database Subnets across separate Availability Zones. NAT Gateway routes outbound traffic for private worker tasks.
 - **Least-Privilege Security Groups**: No `0.0.0.0/0` ingress on internal components. RDS PostgreSQL accepts traffic *only* on port 5432 from the ECS Worker Security Group.
-- **Least-Privilege IAM Roles**: API Gateway execution role is scoped strictly to `sqs:SendMessage`. ECS Worker task role is scoped strictly to SQS consumption (`sqs:ReceiveMessage`, `sqs:DeleteMessage`, `sqs:GetQueueAttributes`) and CloudWatch logging.
+- **AWS Secrets Manager Integration**: Generates a 16-character secure database password via `random_password` and stores it in AWS Secrets Manager. ECS Fargate container automatically retrieves `DB_PASSWORD` at startup using the `secrets` container definition block.
 - **Auto-Scaling on Queue Depth**: CloudWatch metric alarm on `ApproximateNumberOfMessagesVisible > 10` triggers Application Auto Scaling step policies to dynamically scale worker container tasks.
 
 ### CI/CD & Operations Layer
-*(To be populated in Phase 4)*
+- **Automated PR Gateways (`pr.yml`)**: On every Pull Request to `main`:
+  - **TruffleHog**: Automated secret scanning to prevent accidental API keys or secrets from reaching Git.
+  - **Ruff**: Fast Python linting and code formatting checks.
+  - **Pytest**: Unit testing worker processing logic against `moto` AWS mocks and SQLite.
+  - **Terraform Validation**: Enforces `terraform fmt -check` and `terraform validate`.
+- **Automated Deployment Pipeline (`deploy.yml`)**: On merge to `main`, builds container image, pushes to Amazon ECR, and executes non-destructive `terraform apply`.
 
 ---
 
 ## Setup & Teardown
 
-### Local Testing (Unit Tests)
+### Local Testing (Unit Tests & Linting)
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r worker/requirements.txt
+pip install -r worker/requirements.txt ruff pytest
+ruff check .
 pytest
 ```
 

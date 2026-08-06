@@ -1,12 +1,12 @@
 import json
-import pytest
+
 import boto3
+import pytest
+from db import Base, TicketTransaction
+from main import SQSWorker
 from moto import mock_aws
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-
-from db import Base, TicketTransaction, record_transaction
-from main import SQSWorker
 
 
 @pytest.fixture
