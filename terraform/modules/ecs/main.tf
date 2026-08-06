@@ -7,8 +7,8 @@ resource "aws_ecs_cluster" "main" {
   }
 }
 
-resource "aws_cloudwatch_log_group" "worker_logs" {
-  name              = "/ecs/worker-logs${var.environment}"
+resource "aws_cloudwatch_log_group" "worker" {
+  name              = "/ecs/worker-${var.environment}"
   retention_in_days = 7
 
   tags = {

@@ -13,3 +13,7 @@ output "rds_endpoint" {
 output "ecs_cluster_name" {
   value = module.ecs.cluster_name
 }
+
+output "github_actions_role_arn" {
+  value = module.iam.github_actions_role_arn
+}
