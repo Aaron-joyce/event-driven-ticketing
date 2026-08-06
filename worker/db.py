@@ -4,15 +4,24 @@ from sqlalchemy import create_engine, Column, String, Integer, DateTime, Uuid
 from sqlalchemy.orm import declarative_base, sessionmaker
 from datetime import datetime
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/ticket_db")
+def resolve_database_url():
+    db_host = os.getenv("DB_HOST")
+    db_name = os.getenv("DB_NAME", "ticket_db")
+    db_user = os.getenv("DB_USER", "postgres")
+    db_pass = os.getenv("DB_PASSWORD")
+    if db_host and db_pass:
+        return f"postgresql://{db_user}:{db_pass}@{db_host}/{db_name}"
+    return os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/ticket_db")
+
+DATABASE_URL = resolve_database_url()
 
 def get_engine(db_url=None):
-    url = db_url or DATABASE_URL
+    url = db_url or resolve_database_url()
     if url.startswith("sqlite"):
         return create_engine(url, connect_args={"check_same_thread": False})
     return create_engine(url)
 
-engine = get_engine(DATABASE_URL)
+engine = get_engine()
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 

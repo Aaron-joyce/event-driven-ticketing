@@ -68,20 +68,37 @@ flowchart LR
 - **At-Least-Once Delivery & Failure Handling**: SQS messages are only deleted (`sqs:delete_message`) **after** `db.commit()` succeeds. On failure, `db.rollback()` executes, skipping message deletion to allow SQS visibility timeout expiration and retry/DLQ routing.
 
 ### Infrastructure & Security Layer
-*(To be populated in Phase 3)*
+- **Multi-AZ VPC Isolation**: Provisions 2 Public Subnets, 2 Private Application Subnets, and 2 Private Database Subnets across separate Availability Zones. NAT Gateway routes outbound traffic for private worker tasks.
+- **Least-Privilege Security Groups**: No `0.0.0.0/0` ingress on internal components. RDS PostgreSQL accepts traffic *only* on port 5432 from the ECS Worker Security Group.
+- **Least-Privilege IAM Roles**: API Gateway execution role is scoped strictly to `sqs:SendMessage`. ECS Worker task role is scoped strictly to SQS consumption (`sqs:ReceiveMessage`, `sqs:DeleteMessage`, `sqs:GetQueueAttributes`) and CloudWatch logging.
+- **Auto-Scaling on Queue Depth**: CloudWatch metric alarm on `ApproximateNumberOfMessagesVisible > 10` triggers Application Auto Scaling step policies to dynamically scale worker container tasks.
 
 ### CI/CD & Operations Layer
 *(To be populated in Phase 4)*
 
 ---
 
-## Local Development & Testing
+## Setup & Teardown
 
-Run unit tests locally against AWS mocks (`moto`) and in-memory SQLite:
-
+### Local Testing (Unit Tests)
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r worker/requirements.txt
 pytest
+```
+
+### Infrastructure Deployment (Terraform)
+```bash
+cd terraform/environments/dev
+terraform init
+terraform plan
+terraform apply
+```
+
+### Infrastructure Teardown
+To destroy all provisioned AWS resources and avoid unnecessary charges:
+```bash
+cd terraform/environments/dev
+terraform destroy -auto-approve
 ```
