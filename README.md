@@ -47,8 +47,9 @@ flowchart LR
 ├── terraform/
 │   ├── modules/
 │   │   ├── apigateway/     # API Gateway direct SQS integration module
+│   │   ├── backend/        # Remote state S3 bucket & DynamoDB lock table module
 │   │   ├── ecs/            # ECS Fargate worker & scaling module
-│   │   ├── iam/            # Scoped IAM task/execution roles module
+│   │   ├── iam/            # Scoped IAM task/execution/OIDC roles module
 │   │   ├── networking/     # VPC, Subnets, NAT Gateway module
 │   │   ├── rds/            # PostgreSQL RDS module
 │   │   └── sqs/            # SQS & DLQ queue module
@@ -75,8 +76,11 @@ flowchart LR
 - **Least-Privilege Security Groups**: No `0.0.0.0/0` ingress on internal components. RDS PostgreSQL accepts traffic *only* on port 5432 from the ECS Worker Security Group.
 - **AWS Secrets Manager Integration**: Generates a 16-character secure database password via `random_password` and stores it in AWS Secrets Manager. ECS Fargate container automatically retrieves `DB_PASSWORD` at startup using the `secrets` container definition block.
 - **Auto-Scaling on Queue Depth**: CloudWatch metric alarm on `ApproximateNumberOfMessagesVisible > 10` triggers Application Auto Scaling step policies to dynamically scale worker container tasks.
+- **Remote State Management & Locking**: Configures S3 backend (`ticket-terraform-state-dev`) with versioning/encryption and DynamoDB state locking (`ticket-terraform-locks-dev`) to prevent state drift and concurrent CI deployment collisions.
 
 ### CI/CD & Operations Layer
+- **Keyless AWS OIDC Authentication**: Uses IAM OIDC Identity Federation (`sts:AssumeRoleWithWebIdentity`) scoped strictly to `repo:Aaron-joyce/event-driven-ticketing:*`. No static access keys or secret keys stored in Git or GitHub.
+- **Scoped Least-Privilege Deployment Policy**: Replaced broad AWS `PowerUserAccess` with a custom hand-written CI/CD policy (`github-actions-deploy-policy-dev`) restricted strictly to the resources managed by Terraform.
 - **Automated PR Gateways (`pr.yml`)**: On every Pull Request to `main`:
   - **TruffleHog**: Automated secret scanning to prevent accidental API keys or secrets from reaching Git.
   - **Ruff**: Fast Python linting and code formatting checks.
