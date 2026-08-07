@@ -138,8 +138,8 @@ resource "aws_iam_policy" "github_actions_deploy" {
           "s3:DeleteObject"
         ]
         Resource = [
-          "arn:aws:s3:::ticket-terraform-state-dev-899147035705",
-          "arn:aws:s3:::ticket-terraform-state-dev-899147035705/*"
+          "arn:aws:s3:::ticket-terraform-state-dev-071004",
+          "arn:aws:s3:::ticket-terraform-state-dev-071004/*"
         ]
       }
     ]
