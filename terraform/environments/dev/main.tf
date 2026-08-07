@@ -3,7 +3,7 @@ terraform {
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = "~> 5.0"
+      version = "~> 6.0"
     }
     random = {
       source  = "hashicorp/random"
@@ -12,11 +12,11 @@ terraform {
   }
 
   backend "s3" {
-    bucket         = "ticket-terraform-state-dev"
-    key            = "dev/terraform.tfstate"
-    region         = "us-east-1"
-    dynamodb_table = "ticket-terraform-locks-dev"
-    encrypt        = true
+    bucket       = "ticket-terraform-state-dev-071004"
+    key          = "dev/terraform.tfstate"
+    region       = "us-east-1"
+    encrypt      = true
+    use_lockfile = true
   }
 }
 
