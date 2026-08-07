@@ -12,8 +12,8 @@ variable "db_secret_arn" {
 }
 
 variable "github_repo" {
-  type        = string
-  default     = "Aaron-joyce/event-driven-ticketing"
+  type    = string
+  default = "Aaron-joyce/event-driven-ticketing"
 
 }
 

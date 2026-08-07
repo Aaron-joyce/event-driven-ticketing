@@ -1,5 +1,5 @@
 terraform {
-  required_version = ">= 1.5.0"
+  required_version = ">= 1.6.0"
   required_providers {
     aws = {
       source  = "hashicorp/aws"
@@ -25,6 +25,10 @@ provider "aws" {
 }
 
 data "aws_caller_identity" "current" {}
+
+locals {
+  worker_image = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.aws_region}.amazonaws.com/${var.ecr_repository_name}:${var.worker_image_tag}"
+}
 
 module "networking" {
   source      = "../../modules/networking"
@@ -74,4 +78,5 @@ module "ecs" {
   db_secret_arn      = module.rds.db_secret_arn
   db_host            = module.rds.endpoint
   db_name            = module.rds.db_name
+  container_image    = local.worker_image
 }
