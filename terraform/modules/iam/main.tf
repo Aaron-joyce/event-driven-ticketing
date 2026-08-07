@@ -125,6 +125,19 @@ resource "aws_iam_policy" "github_actions_deploy" {
           "iam:CreatePolicy", "iam:DeletePolicy", "iam:GetPolicy", "iam:GetPolicyVersion", "iam:ListPolicyVersions", "iam:TagRole", "iam:UntagRole", "iam:TagPolicy"
         ]
         Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:ListBucket",
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:DeleteObject"
+        ]
+        Resource = [
+          "arn:aws:s3:::ticket-terraform-state-dev-899147035705",
+          "arn:aws:s3:::ticket-terraform-state-dev-899147035705/*"
+        ]
       }
     ]
   })
@@ -147,7 +160,7 @@ resource "aws_iam_role" "api_gateway_sqs" {
         Principal = {
           Service = "apigateway.amazonaws.com"
         }
-      }
+      },
     ]
   })
 }
