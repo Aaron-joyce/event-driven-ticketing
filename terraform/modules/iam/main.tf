@@ -110,7 +110,7 @@ resource "aws_iam_policy" "github_actions_deploy" {
       {
         Effect = "Allow"
         Action = [
-          "cloudwatch:PutMetricAlarm", "cloudwatch:DeleteAlarms", "cloudwatch:DescribeAlarms"
+          "cloudwatch:PutMetricAlarm", "cloudwatch:DeleteAlarms", "cloudwatch:DescribeAlarms", "cloudwatch:ListTagsForResource"
         ]
         Resource = "*"
       },
