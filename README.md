@@ -2,6 +2,9 @@
 
 An asynchronous, event-driven ticket processing pipeline built with **AWS API Gateway**, **Amazon SQS**, **AWS ECS Fargate**, and **Amazon RDS (PostgreSQL)**, fully provisioned via **Terraform** with **GitHub Actions CI/CD**.
 
+
+> **Status:** this was built and deployed on a free-tier AWS account that has since been closed, so the stack is no longer running. The Terraform, worker code and pipelines are in this repo.
+
 ---
 
 ## Architecture Overview
@@ -9,24 +12,24 @@ An asynchronous, event-driven ticket processing pipeline built with **AWS API Ga
 ```mermaid
 flowchart LR
     Client([Client / Postman]) -->|1. HTTP POST /tickets| APIGW[AWS API Gateway]
+    APIGW -->|2. Direct AWS Integration SendMessage| SQS[(SQS Ticket Queue)]
+    SQS -.->|After max receive count - default 3| DLQ[(SQS Dead-Letter Queue)]
     subgraph VPC [AWS VPC - Dev Environment]
         subgraph PublicSubnets [Public Subnets]
             NAT[NAT Gateway]
         end
-        
-        subgraph PrivateSubnets [Private Subnets]
+        subgraph PrivateAppSubnets [Private Application Subnets]
             Worker[Worker Container - ECS Fargate]
-            SQS[(SQS Ticket Queue)]
-            DLQ[(SQS Dead-Letter Queue)]
+        end
+        subgraph PrivateDBSubnets [Private Database Subnets]
             RDS[(RDS PostgreSQL)]
         end
     end
-    
-    APIGW -->|2. Direct AWS Integration SendMessage| SQS
-    SQS -->|3. Poll & Consume Message| Worker
+    Worker -->|3. Poll & Consume Message - via NAT Gateway| SQS
     Worker -->|4. Write Transaction Record| RDS
-    SQS -.->|Failed retries > 3| DLQ
 ```
+
+> SQS and the dead-letter queue are regional AWS services, not VPC resources. The worker reaches them through the NAT Gateway.
 
 ---
 
@@ -117,8 +120,8 @@ curl -X POST https://<api-id>.execute-api.us-east-1.amazonaws.com/dev/tickets \
 - **S3 Native State Locking**: Configures S3 backend (`ticket-terraform-state-dev-071004`) using Terraform's native S3 state locking (`use_lockfile = true` via S3 conditional writes) to prevent concurrent deployment state collisions without requiring DynamoDB tables.
 
 ### CI/CD & Operations Layer
-- **Keyless AWS OIDC Authentication**: Uses IAM OIDC Identity Federation (`sts:AssumeRoleWithWebIdentity`) scoped to repository subjects. Supports both standard repository strings (`repo:Aaron-joyce/event-driven-ticketing:*`) and GitHub's immutable-ID subject claims (`repo:Aaron-joyce@30692913/event-driven-ticketing@1322898996:*`) to prevent spoofing if repositories are renamed.
-- **Scoped Least-Privilege Deployment Policy**: Replaced broad AWS `PowerUserAccess` with a custom hand-written CI/CD policy (`github-actions-deploy-policy-dev`) restricted strictly to the resource actions managed by Terraform.
+- **Keyless AWS OIDC Authentication**: Uses IAM OIDC Identity Federation (`sts:AssumeRoleWithWebIdentity`) with no static AWS credentials stored in GitHub. The role's trust policy requires the `sts.amazonaws.com` audience and matches the immutable-ID subject format (`repo:<owner>@<owner-id>/<repo>@<repo-id>:*`), so it still matches if the repository is renamed. The `:*` suffix means any ref in this repository (including pull request branches) can assume the role.
+- **Service-Scoped Deployment Policy**: Replaced broad AWS `PowerUserAccess` with a custom hand-written CI/CD policy (`github-actions-deploy-policy-dev`) limited to the AWS services Terraform manages. Statements are scoped by service and action, but most use `Resource = "*"` (including `iam:PassRole`), so this is not yet least-privilege. See Known Limitations.
 - **Immutable Image Tagging & ECS Task Replacement**: Container images pushed to Amazon ECR are tagged with commit SHAs alongside `latest`. Updating the task definition container image reference triggers a controlled ECS Fargate rolling replacement (`-/+` destroy-then-create of Task Definition revisions and task instances).
 - **Automated PR Gateways (`pr.yml`)**: On every Pull Request to `main`:
   - **TruffleHog**: Automated secret scanning to prevent accidental API keys or secrets from reaching Git.
@@ -169,3 +172,21 @@ To destroy all provisioned AWS environment resources and avoid unnecessary charg
 cd terraform/environments/dev
 terraform destroy -auto-approve
 ```
+
+---
+
+## Known Limitations
+
+These were identified by reviewing the code and are documented here rather than hidden:
+
+- **Open ingestion endpoint:** `POST /tickets` uses `authorization = "NONE"`, with no API key, usage plan, throttling or request validation at API Gateway. All payload validation happens asynchronously in the worker.
+- **No result feedback:** the API returns a static `202 Accepted`; clients cannot learn whether a ticket was actually processed.
+- **Not idempotent on redelivery:** the worker generates a new `uuid7()` primary key for every insert. If a message is redelivered (for example after a crash between `db.commit()` and `delete_message`), a duplicate row for the same `ticket_id` can be created. A unique constraint on `ticket_id` with an upsert would fix this.
+- **Default queue timing:** the visibility timeout uses the 30-second default, with `max_receive_count` of 3. Neither is tuned to worst-case processing time.
+- **Scale-up only:** autoscaling has a scale-up policy on queue depth but no scale-in policy.
+- **No DLQ monitoring:** there are no alarms on DLQ depth or oldest-message age, and no redrive process.
+- **Single-AZ database:** the VPC spans two AZs, but RDS is single-AZ (see `COST.md`).
+- **Password in Terraform state:** the `random_password` value is stored in Terraform state, so access to the state bucket must be tightly controlled.
+- **No approval gate:** `deploy.yml` runs `terraform apply -auto-approve` on merge to `main`.
+- **Broad IAM resources:** the CI/CD policy uses `Resource = "*"` for most statements, including `iam:PassRole`.
+- **Test coverage:** tests use `moto` and SQLite, so PostgreSQL-specific behaviour and real SQS semantics are not covered. The system was not load-tested.
